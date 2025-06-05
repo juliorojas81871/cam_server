@@ -3,6 +3,7 @@ import { db, schema } from '../src/db.js';
 import { processRowData, logCleansingStats } from '../src/utils/data-cleansing.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { count } from 'drizzle-orm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -85,14 +86,17 @@ function mapLeaseData(row) {
 async function importBuildings() {
   
   const rawData = readExcelFile('2025-5-23-iolp-buildings.xlsx');
-  const processedData = rawData.map(processRowData);
   
+  const processedData = rawData.map(processRowData);
   logCleansingStats(rawData, processedData);
   
   const mappedData = processedData.map(mapBuildingData);
   
-  // Clear existing data
-  await db.delete(schema.buildings);
+  // Verify table is empty
+  const afterDeleteCount = await db.select({ count: count() }).from(schema.buildings);  
+  if (afterDeleteCount[0].count > 0) {
+    throw new Error(`Failed to clear buildings table! Still has ${afterDeleteCount[0].count} records`);
+  }
   
   // Insert in batches
   const batchSize = 100;
@@ -104,26 +108,34 @@ async function importBuildings() {
     inserted += batch.length;
   }
   
-  console.log('Buildings import completed');
+  // Verify final count
+  const finalCount = await db.select({ count: count() }).from(schema.buildings);
+  
+  if (finalCount[0].count !== mappedData.length) {
+    throw new Error(`Count mismatch! Expected ${mappedData.length}, got ${finalCount[0].count}`);
+  }
 }
-
 
 //  Import leases data
 async function importLeases() {
   
   const rawData = readExcelFile('2025-5-23-iolp-leases.xlsx');
-  const processedData = rawData.map(processRowData);
   
+  const processedData = rawData.map(processRowData);
   logCleansingStats(rawData, processedData);
   
   const mappedData = processedData.map(mapLeaseData);
   
-  // Clear existing data
-  await db.delete(schema.leases);
+  // Verify table is empty
+  const afterDeleteCount = await db.select({ count: count() }).from(schema.leases);  
+  if (afterDeleteCount[0].count > 0) {
+    throw new Error(`Failed to clear leases table! Still has ${afterDeleteCount[0].count} records`);
+  }
   
   // Insert in batches
   const batchSize = 100;
   let inserted = 0;
+  
   
   for (let i = 0; i < mappedData.length; i += batchSize) {
     const batch = mappedData.slice(i, i + batchSize);
@@ -131,22 +143,19 @@ async function importLeases() {
     inserted += batch.length;
   }
   
-  console.log('Leases import completed');
+  // Verify final count
+  const finalCount = await db.select({ count: count() }).from(schema.leases);
+  
+  if (finalCount[0].count !== mappedData.length) {
+    throw new Error(`Count mismatch! Expected ${mappedData.length}, got ${finalCount[0].count}`);
+  }
 }
 
 // Main import function
 async function main() {
   try {
-    
     await importBuildings();
-    await importLeases();
-    
-    console.log('Data import completed successfully!');
-    
-    // Show some summary stats
-    const buildingsCount = await db.select().from(schema.buildings);
-    const leasesCount = await db.select().from(schema.leases);
-    
+    await importLeases();    
   } catch (error) {
     console.error('Import failed:', error);
     process.exit(1);
@@ -155,12 +164,8 @@ async function main() {
   process.exit(0);
 }
 
-// Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
-}
-
-// Also run if this is the main module
-if (process.argv[1] && process.argv[1].endsWith('import-data.js')) {
+// Run if called directly or as main module
+if (import.meta.url === `file://${process.argv[1]}` || 
+    (process.argv[1] && process.argv[1].endsWith('import-data.js'))) {
   main();
 } 

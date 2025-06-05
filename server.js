@@ -27,7 +27,6 @@ app.get('/api/buildings', async (req, res) => {
     
     res.json({
       data: buildings,
-      count: buildings.length
     });
     
   } catch (error) {
@@ -43,7 +42,6 @@ app.get('/api/leases', async (req, res) => {
     
     res.json({
       data: leases,
-      count: leases.length
     });
     
   } catch (error) {

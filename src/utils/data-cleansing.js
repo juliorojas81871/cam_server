@@ -15,51 +15,115 @@ export function hasAddressInName(name) {
   return addressPatterns.some(pattern => pattern.test(name));
 }
 
+// Extract building name from combined address/name strings
+function extractBuildingName(text) {
+  if (!text) return text;
+  
+  let cleaned = text.trim();
+  
+  // Define delimiters in order of priority
+  // Most specific to least specific separators
+  const delimiters = [
+    ' - ',
+    ' – ',
+    ', ',
+    ' / ',
+    ': ',
+    ' | ',
+    ' @ ',
+    ' at '
+  ];
+  
+  // Process each delimiter
+  for (const delimiter of delimiters) {
+    if (cleaned.includes(delimiter)) {
+      const parts = cleaned.split(delimiter).map(part => part.trim());
+      
+      if (parts.length >= 2) {
+        // Strategy: Take the part that looks least like an address
+        let bestPart = parts[0];
+        let bestScore = scoreAsNonAddress(parts[0]);
+        
+        for (let i = 1; i < parts.length; i++) {
+          const score = scoreAsNonAddress(parts[i]);
+          if (score > bestScore) {
+            bestPart = parts[i];
+            bestScore = score;
+          }
+        }
+        
+        cleaned = bestPart;
+        break; // Stop after first delimiter match
+      }
+    }
+  }
+  
+  return cleaned.trim();
+}
+
+// Score a text part based on how likely it is to be a building name (vs address)
+function scoreAsNonAddress(text) {
+  if (!text || text.length < 2) return 0;
+  
+  let score = 10; // Base score
+  
+  // Penalize if starts with numbers (likely address)
+  if (/^\d/.test(text)) {
+    score -= 15;
+  }
+  
+  // Penalize street indicators
+  if (/\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|way|pl|place)\b/i.test(text)) {
+    score -= 10;
+  }
+  
+  // Penalize zip codes
+  if (/\d{5}(-\d{4})?/.test(text)) {
+    score -= 20;
+  }
+  
+  // Reward proper building name indicators
+  if (/\b(center|centre|plaza|tower|building|complex|mall|square|park|place)\b/i.test(text)) {
+    score += 15;
+  }
+  
+  // Reward capitalized words (building names often have proper capitalization)
+  const capitalizedWords = text.match(/\b[A-Z][a-z]+/g);
+  if (capitalizedWords && capitalizedWords.length > 1) {
+    score += 5;
+  }
+  
+  // Penalize very short parts
+  if (text.length < 5) {
+    score -= 5;
+  }
+  
+  return score;
+}
+
 // Attempts to clean building names by removing or separating address components
 export function cleanBuildingName(name) {
   if (!name) return name;
   
   let cleaned = name.trim();
   
-  // Step 1: Remove common address suffixes at the end
+  // Step 1: Use the improved extraction logic
+  cleaned = extractBuildingName(cleaned);
+  
+  // Step 2: Remove common address suffixes at the end
   cleaned = cleaned.replace(/,?\s*\d{5}(-\d{4})?\s*$/, ''); // Remove ZIP codes
   cleaned = cleaned.replace(/,?\s*(suite|ste|floor|fl|room|rm)\s*\d+\s*$/i, ''); // Remove suite/floor numbers
   
-  // Step 2: Split on common separators and take the first part if it looks like a building name
-  const separators = [' - ', ' – ', ' | ', ' @ ', ' at '];
-  for (const sep of separators) {
-    if (cleaned.includes(sep)) {
-      const parts = cleaned.split(sep);
-      if (parts.length > 1) {
-        // Take the first part if it doesn't start with a number (likely building name)
-        if (!/^\d/.test(parts[0].trim())) {
-          cleaned = parts[0].trim();
-          break;
-        }
-      }
-    }
-  }
-  
-  // Step 3: If name starts with an address, try to extract building name after comma
-  if (/^\d+\s+[A-Za-z]/.test(cleaned)) {
-    const commaParts = cleaned.split(',');
-    if (commaParts.length > 1) {
-      // Look for a part that doesn't start with a number
-      for (let i = 1; i < commaParts.length; i++) {
-        const part = commaParts[i].trim();
-        if (part && !/^\d/.test(part) && part.length > 3) {
-          cleaned = part;
-          break;
-        }
-      }
-    }
-  }
-  
-  // Step 4: Clean up extra whitespace and punctuation
+  // Step 3: Clean up extra whitespace and punctuation
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
   cleaned = cleaned.replace(/^[,\-\s]+|[,\-\s]+$/g, '');
   
-  return cleaned || name; // Return original if cleaning resulted in empty string
+  // Step 4: Handle edge cases where cleaning resulted in something too short or empty
+  if (!cleaned || cleaned.length < 3) {
+    return name; // Return original if cleaning was too aggressive
+  }
+  
+  return cleaned;
 }
 
 // Process a row of data and add cleaned building name fields
@@ -80,14 +144,4 @@ export function logCleansingStats(originalData, processedData) {
   const cleaned = processedData.filter(row => 
     row.cleanedBuildingName !== (row['Real Property Asset Name'] || '')
   ).length;
-  
-  // Show some examples
-  if (withAddresses > 0) {
-    let examples = 0;
-    for (const row of processedData) {
-      if (row.addressInName && examples < 3) {
-        examples++;
-      }
-    }
-  }
 } 
