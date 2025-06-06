@@ -36,8 +36,6 @@ if (missingVars.length > 0) {
 
 const connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 
-console.log(`Attempting to connect to database: ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
-
 // Create postgres connection
 const client = postgres(connectionString);
 

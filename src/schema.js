@@ -41,6 +41,7 @@ export const leases = pgTable('leases', {
   longitude: numeric('longitude'),
   buildingRentableSquareFeet: numeric('building_rentable_square_feet'),
   availableSquareFeet: numeric('available_square_feet', { precision: 10, scale: 0 }).default(0),
+  constructionDate: text('construction_date'),
   congressionalDistrict: text('congressional_district'),
   congressionalDistrictRepresentative: text('congressional_district_representative'),
   leaseNumber: text('lease_number'),

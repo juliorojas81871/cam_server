@@ -65,6 +65,7 @@ async function createTables() {
         longitude NUMERIC,
         building_rentable_square_feet NUMERIC,
         available_square_feet NUMERIC(10,0) DEFAULT 0,
+        construction_date TEXT,
         congressional_district TEXT,
         congressional_district_representative TEXT,
         lease_number TEXT,

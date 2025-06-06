@@ -3,7 +3,7 @@ import { db, schema } from '../src/db.js';
 import { processRowData, logCleansingStats } from '../src/utils/data-cleansing.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { count } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,7 +55,7 @@ function mapBuildingData(row) {
   };
 }
 
-//  Map Excel columns to database fields for leases
+// Map Excel columns to database fields for leases
 function mapLeaseData(row) {
   return {
     locationCode: row['Location Code'],
@@ -71,6 +71,7 @@ function mapLeaseData(row) {
     longitude: row['Longitude'] ? String(row['Longitude']) : null,
     buildingRentableSquareFeet: row['Building Rentable Square Feet'] ? String(row['Building Rentable Square Feet']) : null,
     availableSquareFeet: parseAvailableSquareFeet(row['Available Square Feet']),
+    constructionDate: row['Construction Date'],
     congressionalDistrict: row['Congressional District'],
     congressionalDistrictRepresentative: row['Congressional District Representative'],
     leaseNumber: row['Lease Number'],
@@ -82,80 +83,157 @@ function mapLeaseData(row) {
   };
 }
 
-// Import buildings data
+// Check if a lease already exists in the database by street address
+async function findExistingLease(leaseData) {
+  const existing = await db.select()
+    .from(schema.leases)
+    .where(eq(schema.leases.streetAddress, leaseData.streetAddress));
+  
+  return existing.length > 0 ? existing[0] : null;
+}
+
+// Convert building data to lease format
+function convertBuildingToLease(buildingRow) {
+  return {
+    locationCode: buildingRow['Location Code'],
+    realPropertyAssetName: buildingRow['Real Property Asset Name'],
+    installationName: buildingRow['Installation Name'],
+    federalLeasedCode: null, // Not available in building data
+    gsaRegion: buildingRow['GSA Region'],
+    streetAddress: buildingRow['Street Address'],
+    city: buildingRow['City'],
+    state: buildingRow['State'],
+    zipCode: buildingRow['Zip Code'],
+    latitude: buildingRow['Latitude'] ? String(buildingRow['Latitude']) : null,
+    longitude: buildingRow['Longitude'] ? String(buildingRow['Longitude']) : null,
+    buildingRentableSquareFeet: buildingRow['Building Rentable Square Feet'] ? String(buildingRow['Building Rentable Square Feet']) : null,
+    availableSquareFeet: parseAvailableSquareFeet(buildingRow['Available Square Feet']),
+    constructionDate: buildingRow['Construction Date'],
+    congressionalDistrict: buildingRow['Congressional District'],
+    congressionalDistrictRepresentative: buildingRow['Congressional District Representative Name'],
+    leaseNumber: null, // Not available in building data
+    leaseEffectiveDate: null, // Not available in building data
+    leaseExpirationDate: null, // Not available in building data
+    realPropertyAssetType: buildingRow['Real Property Asset Type'],
+    cleanedBuildingName: buildingRow.cleanedBuildingName,
+    addressInName: buildingRow.addressInName,
+  };
+}
+
+// Import buildings data - ONLY F (owned) buildings
 async function importBuildings() {
   
   const rawData = readExcelFile('2025-5-23-iolp-buildings.xlsx');
   
   const processedData = rawData.map(processRowData);
-  logCleansingStats(rawData, processedData);
   
-  const mappedData = processedData.map(mapBuildingData);
+  // Separate by ownership status
+  const ownedBuildings = processedData.filter(row => 
+    row['Owned or Leased'] && row['Owned or Leased'] === 'F'
+  );
+  const leasedBuildings = processedData.filter(row => 
+    row['Owned or Leased'] && row['Owned or Leased'] === 'L'
+  );
   
-  // Verify table is empty
-  const afterDeleteCount = await db.select({ count: count() }).from(schema.buildings);  
-  if (afterDeleteCount[0].count > 0) {
-    throw new Error(`Failed to clear buildings table! Still has ${afterDeleteCount[0].count} records`);
+  // Clear existing tables
+  await db.delete(schema.buildings);
+  await db.delete(schema.leases);
+  
+  const afterDeleteBuildings = await db.select({ count: count() }).from(schema.buildings);
+  const afterDeleteLeases = await db.select({ count: count() }).from(schema.leases);
+  
+  if (afterDeleteBuildings[0].count > 0 || afterDeleteLeases[0].count > 0) {
+    throw new Error(`Failed to clear tables! Buildings: ${afterDeleteBuildings[0].count}, Leases: ${afterDeleteLeases[0].count}`);
   }
   
-  // Insert in batches
-  const batchSize = 100;
-  let inserted = 0;
-  
-  for (let i = 0; i < mappedData.length; i += batchSize) {
-    const batch = mappedData.slice(i, i + batchSize);
-    await db.insert(schema.buildings).values(batch);
-    inserted += batch.length;
+  // Import ONLY owned buildings (F) to buildings table
+  if (ownedBuildings.length > 0) {
+    const ownedMappedData = ownedBuildings.map(mapBuildingData);
+    
+    const batchSize = 100;
+    for (let i = 0; i < ownedMappedData.length; i += batchSize) {
+      const batch = ownedMappedData.slice(i, i + batchSize);
+      await db.insert(schema.buildings).values(batch);
+    }
   }
   
-  // Verify final count
-  const finalCount = await db.select({ count: count() }).from(schema.buildings);
-  
-  if (finalCount[0].count !== mappedData.length) {
-    throw new Error(`Count mismatch! Expected ${mappedData.length}, got ${finalCount[0].count}`);
+  // Import leased buildings (L) to LEASES table
+  if (leasedBuildings.length > 0) {
+    const leasedMappedData = leasedBuildings.map(convertBuildingToLease);
+    
+    const batchSize = 100;
+    for (let i = 0; i < leasedMappedData.length; i += batchSize) {
+      const batch = leasedMappedData.slice(i, i + batchSize);
+      await db.insert(schema.leases).values(batch);
+    }
   }
 }
 
-//  Import leases data
-async function importLeases() {
-  
-  const rawData = readExcelFile('2025-5-23-iolp-leases.xlsx');
-  
+// Import leases data, checking for existing street addresses in leases table
+async function importLeases() {  
+  const rawData = readExcelFile('2025-5-23-iolp-leases.xlsx');  
   const processedData = rawData.map(processRowData);
-  logCleansingStats(rawData, processedData);
   
-  const mappedData = processedData.map(mapLeaseData);
+  // Check which lease records have street addresses already in leases table
+  let newLeaseRecords = [];
+  let updatedLeaseRecords = [];
+  let duplicateAddressCount = 0;
   
-  // Verify table is empty
-  const afterDeleteCount = await db.select({ count: count() }).from(schema.leases);  
-  if (afterDeleteCount[0].count > 0) {
-    throw new Error(`Failed to clear leases table! Still has ${afterDeleteCount[0].count} records`);
+  for (const leaseRow of processedData) {
+    const mappedLease = mapLeaseData(leaseRow);
+    
+    // Check if this street address already exists in leases table
+    const existingLease = await findExistingLease(mappedLease);
+    
+    if (existingLease) {
+      duplicateAddressCount++;
+      // Update existing lease with lease-specific information
+      updatedLeaseRecords.push({
+        id: existingLease.id,
+        leaseNumber: mappedLease.leaseNumber,
+        leaseEffectiveDate: mappedLease.leaseEffectiveDate,
+        leaseExpirationDate: mappedLease.leaseExpirationDate,
+        federalLeasedCode: mappedLease.federalLeasedCode
+      });
+    } else {
+      // This is a new street address
+      newLeaseRecords.push(mappedLease);
+    }
   }
   
-  // Insert in batches
-  const batchSize = 100;
-  let inserted = 0;
-  
-  
-  for (let i = 0; i < mappedData.length; i += batchSize) {
-    const batch = mappedData.slice(i, i + batchSize);
-    await db.insert(schema.leases).values(batch);
-    inserted += batch.length;
+  // Update existing lease records with lease-specific information
+  if (updatedLeaseRecords.length > 0) {
+    for (const updateData of updatedLeaseRecords) {
+      await db.update(schema.leases)
+        .set({
+          leaseNumber: updateData.leaseNumber,
+          leaseEffectiveDate: updateData.leaseEffectiveDate,
+          leaseExpirationDate: updateData.leaseExpirationDate,
+          federalLeasedCode: updateData.federalLeasedCode
+        })
+        .where(eq(schema.leases.id, updateData.id));
+    }
   }
   
-  // Verify final count
-  const finalCount = await db.select({ count: count() }).from(schema.leases);
-  
-  if (finalCount[0].count !== mappedData.length) {
-    throw new Error(`Count mismatch! Expected ${mappedData.length}, got ${finalCount[0].count}`);
+  // Import new lease records
+  if (newLeaseRecords.length > 0) {
+    const batchSize = 100;
+    for (let i = 0; i < newLeaseRecords.length; i += batchSize) {
+      const batch = newLeaseRecords.slice(i, i + batchSize);
+      await db.insert(schema.leases).values(batch);
+    }
   }
+  
+  // Verify final counts
+  const finalBuildingCount = await db.select({ count: count() }).from(schema.buildings);
+  const finalLeaseCount = await db.select({ count: count() }).from(schema.leases);
 }
 
 // Main import function
 async function main() {
   try {
-    await importBuildings();
-    await importLeases();    
+    await importBuildings(); // First: Buildings separated by f(owned)/l(leased)
+    await importLeases();    // Second: Leases with duplicate checking    
   } catch (error) {
     console.error('Import failed:', error);
     process.exit(1);
