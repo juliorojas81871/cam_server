@@ -20,17 +20,18 @@ app.get('/health', (req, res) => {
 
 // API Routes
 
-// Get all buildings
-app.get('/api/buildings', async (req, res) => {
+// Get all owned properties
+app.get('/api/owned', async (req, res) => {
   try {
-    const buildings = await db.select().from(schema.buildings);
+    const owned = await db.select().from(schema.owned);
     
     res.json({
-      data: buildings,
+      data: owned,
+      count: owned.length
     });
     
   } catch (error) {
-    console.error('Error fetching buildings:', error);
+    console.error('Error fetching owned properties:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -65,7 +66,7 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`API endpoints:`);
-  console.log(`   GET /api/buildings - Get all buildings`);
+  console.log(`   GET /api/owned - Get all owned properties`);
   console.log(`   GET /api/leases - Get all leases`);
   console.log(`   GET /health - Health check`);
 }); 

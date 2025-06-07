@@ -1,6 +1,6 @@
 import { pgTable, serial, text, numeric, integer, date, boolean } from 'drizzle-orm/pg-core';
 
-export const buildings = pgTable('buildings', {
+export const owned = pgTable('owned', {
   id: serial('id').primaryKey(),
   locationCode: text('location_code'),
   realPropertyAssetName: text('real_property_asset_name'),

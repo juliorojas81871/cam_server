@@ -18,12 +18,12 @@ async function createTables() {
   try {
     
     // Drop existing tables
-    await sql`DROP TABLE IF EXISTS buildings CASCADE`;
+    await sql`DROP TABLE IF EXISTS owned CASCADE`;
     await sql`DROP TABLE IF EXISTS leases CASCADE`;
     
-    // Create buildings table
+    // Create owned table
     await sql`
-      CREATE TABLE buildings (
+      CREATE TABLE owned (
         id SERIAL PRIMARY KEY,
         location_code TEXT,
         real_property_asset_name TEXT,

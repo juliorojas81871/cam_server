@@ -20,6 +20,21 @@ function readExcelFile(filename) {
   return jsonData;
 }
 
+// Convert Excel serial date to proper date string
+function convertExcelDate(excelDate) {
+  if (!excelDate || excelDate === '' || isNaN(excelDate)) {
+    return null;
+  }
+  
+  // Excel date serial number starts from 1900-01-01
+  // But Excel incorrectly treats 1900 as a leap year, so we need to adjust
+  const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
+  const date = new Date(excelEpoch.getTime() + (parseInt(excelDate) * 24 * 60 * 60 * 1000));
+  
+  // Return in YYYY-MM-DD format
+  return date.toISOString().split('T')[0];
+}
+
 // Handle availableSquareFeet to ensure it's numeric and defaults to 0
 function parseAvailableSquareFeet(value) {
   if (!value || value === '' || value === null || value === undefined) {
@@ -75,8 +90,8 @@ function mapLeaseData(row) {
     congressionalDistrict: row['Congressional District'],
     congressionalDistrictRepresentative: row['Congressional District Representative'],
     leaseNumber: row['Lease Number'],
-    leaseEffectiveDate: row['Lease Effective Date'],
-    leaseExpirationDate: row['Lease Expiration Date'],
+    leaseEffectiveDate: convertExcelDate(row['Lease Effective Date']),
+    leaseExpirationDate: convertExcelDate(row['Lease Expiration Date']),
     realPropertyAssetType: row['Real Property Asset type'],
     cleanedBuildingName: row.cleanedBuildingName,
     addressInName: row.addressInName,
@@ -112,7 +127,7 @@ function convertBuildingToLease(buildingRow) {
     congressionalDistrict: buildingRow['Congressional District'],
     congressionalDistrictRepresentative: buildingRow['Congressional District Representative Name'],
     leaseNumber: null, // Not available in building data
-    leaseEffectiveDate: null, // Not available in building data
+    leaseEffectiveDate: null, // Not available in building data  
     leaseExpirationDate: null, // Not available in building data
     realPropertyAssetType: buildingRow['Real Property Asset Type'],
     cleanedBuildingName: buildingRow.cleanedBuildingName,
@@ -136,24 +151,24 @@ async function importBuildings() {
   );
   
   // Clear existing tables
-  await db.delete(schema.buildings);
+  await db.delete(schema.owned);
   await db.delete(schema.leases);
   
-  const afterDeleteBuildings = await db.select({ count: count() }).from(schema.buildings);
+  const afterDeleteOwned = await db.select({ count: count() }).from(schema.owned);
   const afterDeleteLeases = await db.select({ count: count() }).from(schema.leases);
   
-  if (afterDeleteBuildings[0].count > 0 || afterDeleteLeases[0].count > 0) {
-    throw new Error(`Failed to clear tables! Buildings: ${afterDeleteBuildings[0].count}, Leases: ${afterDeleteLeases[0].count}`);
+  if (afterDeleteOwned[0].count > 0 || afterDeleteLeases[0].count > 0) {
+    throw new Error(`Failed to clear tables! Owned: ${afterDeleteOwned[0].count}, Leases: ${afterDeleteLeases[0].count}`);
   }
   
-  // Import ONLY owned buildings (F) to buildings table
+  // Import ONLY owned buildings (F) to owned table
   if (ownedBuildings.length > 0) {
     const ownedMappedData = ownedBuildings.map(mapBuildingData);
     
     const batchSize = 100;
     for (let i = 0; i < ownedMappedData.length; i += batchSize) {
       const batch = ownedMappedData.slice(i, i + batchSize);
-      await db.insert(schema.buildings).values(batch);
+      await db.insert(schema.owned).values(batch);
     }
   }
   
@@ -225,7 +240,7 @@ async function importLeases() {
   }
   
   // Verify final counts
-  const finalBuildingCount = await db.select({ count: count() }).from(schema.buildings);
+  const finalBuildingCount = await db.select({ count: count() }).from(schema.owned);
   const finalLeaseCount = await db.select({ count: count() }).from(schema.leases);
 }
 
