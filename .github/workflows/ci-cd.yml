@@ -1,0 +1,137 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: cam_database_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Set up environment variables
+      run: |
+        echo "DB_HOST=localhost" >> $GITHUB_ENV
+        echo "DB_PORT=5432" >> $GITHUB_ENV
+        echo "DB_NAME=cam_database_test" >> $GITHUB_ENV
+        echo "DB_USER=postgres" >> $GITHUB_ENV
+        echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
+        echo "PORT=3000" >> $GITHUB_ENV
+
+    - name: Setup database
+      run: node setup-db.js
+
+    - name: Run linting (if available)
+      run: npm run lint
+      continue-on-error: true
+
+    - name: Run Jest tests
+      run: npm test
+
+    - name: Run Jest tests with coverage
+      run: npm run test:coverage
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+      continue-on-error: true
+
+    - name: Test server startup
+      run: |
+        timeout 10s node server.js &
+        sleep 5
+        curl -f http://localhost:3000/health || exit 1
+        pkill -f "node server.js" || true
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci --only=production
+
+    - name: Create deployment artifact
+      run: |
+        tar -czf deployment.tar.gz \
+          --exclude=node_modules \
+          --exclude=.git \
+          --exclude=.github \
+          --exclude=*.xlsx \
+          --exclude=*.log \
+          --exclude=coverage \
+          --exclude=__tests__ \
+          .
+        
+    - name: Upload deployment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cam-server-${{ github.sha }}
+        path: deployment.tar.gz
+        retention-days: 30
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: Download deployment artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: cam-server-${{ github.sha }}
+
+    - name: Deploy notification
+      run: |
+        echo "🚀 Deployment artifact ready: cam-server-${{ github.sha }}"
+        echo "📦 Artifact contains the production-ready server"
+        echo "🔧 Next steps:"
+        echo "  1. Download the artifact"
+        echo "  2. Extract: tar -xzf deployment.tar.gz"
+        echo "  3. Install dependencies: npm ci --only=production"
+        echo "  4. Set environment variables"
+        echo "  5. Setup database: node setup-db.js"
+        echo "  6. Start server: npm start"
