@@ -115,7 +115,6 @@ jobs:
           --exclude=node_modules \
           --exclude=.git \
           --exclude=.github \
-          --exclude=*.xlsx \
           --exclude=*.log \
           --exclude=*.tmp \
           --exclude=coverage \
@@ -124,6 +123,7 @@ jobs:
           --exclude=.cache \
           --exclude=*.pid \
           --exclude=deployment.tar.gz \
+          --exclude=~$*.xlsx \
           . || echo "Warning: Some files may have changed during archiving"
         
     - name: Upload deployment artifact

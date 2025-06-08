@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -11,7 +11,15 @@ async function startProduction() {
     // Step 1: Setup database tables
     await execAsync('node setup-db.js');
 
-    // Step 2: Start the server
+    // Step 2: Import data if Excel files exist
+    const buildingsFile = '2025-5-23-iolp-buildings.xlsx';
+    const leasesFile = '2025-5-23-iolp-leases.xlsx';
+    
+    if (fs.existsSync(buildingsFile) && fs.existsSync(leasesFile)) {
+      await execAsync('node scripts/import-data.js');
+    }
+
+    console.log('Starting web server...');
     const serverProcess = exec('node server.js');
     
     // Forward server output

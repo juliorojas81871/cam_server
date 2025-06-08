@@ -27,7 +27,6 @@ app.get('/api/owned', async (req, res) => {
     
     res.json({
       data: owned,
-      count: owned.length
     });
     
   } catch (error) {
