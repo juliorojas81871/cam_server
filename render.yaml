@@ -1,5 +1,5 @@
 services:
-  - type: pserv
+  - type: web
     name: cam-database
     env: node
     plan: free
@@ -9,8 +9,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: DB_HOST
         fromDatabase:
           name: cam-postgres
