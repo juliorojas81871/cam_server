@@ -112,24 +112,38 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
+// Graceful shutdown handling for Fly.io
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
 // Start server with better error handling
 async function startServer() {
   try {
+    console.log('Starting CAM Database Server...');
+    console.log('Environment:', process.env.NODE_ENV || 'development');
+    console.log('Port:', PORT);
+    
     // Test database connection (non-blocking)
     await testDatabaseConnection();
     
-    // Start HTTP server
+    // Start HTTP server - bind to 0.0.0.0 for Fly.io
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
-      console.log(`📊 API endpoints:`);
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+      console.log(`API endpoints:`);
       console.log(`   GET /api/owned - Get all owned properties`);
       console.log(`   GET /api/leases - Get all leases`);
       console.log(`   GET /health - Health check`);
       
       if (!dbConnected) {
-        console.log('⚠️  Warning: Database not connected. API endpoints will return 503.');
-        console.log('   Make sure to set the following environment variables:');
-        console.log('   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD');
+        console.log('Warning: Database not connected. API endpoints will return 503.');
+        console.log('Set environment variables: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD');
       }
     });
 
@@ -138,6 +152,18 @@ async function startServer() {
       console.error('Server error:', error);
       process.exit(1);
     });
+
+    // Graceful shutdown
+    const gracefulShutdown = () => {
+      console.log('Shutting down gracefully...');
+      server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
 
   } catch (error) {
     console.error('Failed to start server:', error);
