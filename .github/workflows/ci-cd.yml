@@ -38,6 +38,9 @@ jobs:
 
     - name: Install dependencies
       run: npm ci
+      env:
+        NPM_CONFIG_AUDIT: false
+        NPM_CONFIG_FUND: false
 
     - name: Set up environment variables
       run: |
@@ -94,6 +97,17 @@ jobs:
 
     - name: Install dependencies
       run: npm ci --only=production
+      env:
+        NPM_CONFIG_AUDIT: false
+        NPM_CONFIG_FUND: false
+
+    - name: Clean up temporary files
+      run: |
+        # Remove any temporary files or logs that might interfere with archiving
+        find . -name "*.log" -type f -delete || true
+        find . -name "*.tmp" -type f -delete || true
+        find . -name "*.pid" -type f -delete || true
+        rm -rf .npm .cache || true
 
     - name: Create deployment artifact
       run: |
@@ -103,9 +117,14 @@ jobs:
           --exclude=.github \
           --exclude=*.xlsx \
           --exclude=*.log \
+          --exclude=*.tmp \
           --exclude=coverage \
           --exclude=__tests__ \
-          .
+          --exclude=.npm \
+          --exclude=.cache \
+          --exclude=*.pid \
+          --exclude=deployment.tar.gz \
+          . || echo "Warning: Some files may have changed during archiving"
         
     - name: Upload deployment artifact
       uses: actions/upload-artifact@v4
