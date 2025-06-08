@@ -13,7 +13,8 @@
     "db:setup": "node setup-db.js",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
-    "import": "node scripts/import-data.js"
+    "import": "node scripts/import-data.js",
+    "deploy-check": "node scripts/deploy-check.js"
   },
   "jest": {
     "globals": {
