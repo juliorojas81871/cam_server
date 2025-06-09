@@ -49,7 +49,7 @@ jobs:
         echo "DB_NAME=cam_database_test" >> $GITHUB_ENV
         echo "DB_USER=postgres" >> $GITHUB_ENV
         echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
-        echo "PORT=3000" >> $GITHUB_ENV
+        echo "PORT=3001" >> $GITHUB_ENV
 
     - name: Setup database
       run: node setup-db.js
@@ -76,7 +76,7 @@ jobs:
       run: |
         timeout 10s node server.js &
         sleep 5
-        curl -f http://localhost:3000/health || exit 1
+        curl -f http://localhost:3001/health || exit 1
         pkill -f "node server.js" || true
 
   build:
