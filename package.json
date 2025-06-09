@@ -16,8 +16,8 @@
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
     "import": "node scripts/import-data.js",
-    "data-check": "node scripts/check-data.js",
-    "deploy-check": "node scripts/deploy-check.js"
+    "import-json": "node scripts/import-json-data.js",
+    "export-json": "node scripts/export-data-to-json.js"
   },
   "jest": {
     "globals": {

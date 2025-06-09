@@ -62,15 +62,10 @@ app.use((req, res) => {
 });
 
 // Start server
-const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
-
-app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
   console.log(`API endpoints:`);
   console.log(`   GET /api/owned - Get all owned properties`);
   console.log(`   GET /api/leases - Get all leases`);
   console.log(`   GET /health - Health check`);
-}).on('error', (err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+}); 
