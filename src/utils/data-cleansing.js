@@ -136,12 +136,3 @@ export function processRowData(row) {
     addressInName: hasAddressInName(assetName)
   };
 }
-
-// Log data cleansing statistics
-export function logCleansingStats(originalData, processedData) {
-  const totalRecords = processedData.length;
-  const withAddresses = processedData.filter(row => row.addressInName).length;
-  const cleaned = processedData.filter(row => 
-    row.cleanedBuildingName !== (row['Real Property Asset Name'] || '')
-  ).length;
-} 

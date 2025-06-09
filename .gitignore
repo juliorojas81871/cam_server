@@ -12,7 +12,6 @@ yarn-error.log*
 .env.production.local
 
 # Data files (Excel files with sensitive data)
-*.xlsx
 *.xls
 *.csv
 

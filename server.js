@@ -60,12 +60,3 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`API endpoints:`);
-  console.log(`   GET /api/owned - Get all owned properties`);
-  console.log(`   GET /api/leases - Get all leases`);
-  console.log(`   GET /health - Health check`);
-}); 

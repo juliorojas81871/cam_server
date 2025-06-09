@@ -1,6 +1,6 @@
 import XLSX from 'xlsx';
 import { db, schema } from '../src/db.js';
-import { processRowData, logCleansingStats } from '../src/utils/data-cleansing.js';
+import { processRowData } from '../src/utils/data-cleansing.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { count, eq } from 'drizzle-orm';
@@ -26,9 +26,7 @@ function convertExcelDate(excelDate) {
     return null;
   }
   
-  // Excel date serial number starts from 1900-01-01
-  // But Excel incorrectly treats 1900 as a leap year, so we need to adjust
-  const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
+  const excelEpoch = new Date(1899, 11, 30);
   const date = new Date(excelEpoch.getTime() + (parseInt(excelDate) * 24 * 60 * 60 * 1000));
   
   // Return in YYYY-MM-DD format
@@ -113,7 +111,7 @@ function convertBuildingToLease(buildingRow) {
     locationCode: buildingRow['Location Code'],
     realPropertyAssetName: buildingRow['Real Property Asset Name'],
     installationName: buildingRow['Installation Name'],
-    federalLeasedCode: null, // Not available in building data
+    federalLeasedCode: null,
     gsaRegion: buildingRow['GSA Region'],
     streetAddress: buildingRow['Street Address'],
     city: buildingRow['City'],
@@ -126,9 +124,9 @@ function convertBuildingToLease(buildingRow) {
     constructionDate: buildingRow['Construction Date'],
     congressionalDistrict: buildingRow['Congressional District'],
     congressionalDistrictRepresentative: buildingRow['Congressional District Representative Name'],
-    leaseNumber: null, // Not available in building data
-    leaseEffectiveDate: null, // Not available in building data  
-    leaseExpirationDate: null, // Not available in building data
+    leaseNumber: null, 
+    leaseEffectiveDate: null,
+    leaseExpirationDate: null,
     realPropertyAssetType: buildingRow['Real Property Asset Type'],
     cleanedBuildingName: buildingRow.cleanedBuildingName,
     addressInName: buildingRow.addressInName,
@@ -239,9 +237,6 @@ async function importLeases() {
     }
   }
   
-  // Verify final counts
-  const finalBuildingCount = await db.select({ count: count() }).from(schema.owned);
-  const finalLeaseCount = await db.select({ count: count() }).from(schema.leases);
 }
 
 // Main import function
