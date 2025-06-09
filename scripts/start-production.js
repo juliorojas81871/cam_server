@@ -6,17 +6,27 @@ import fs from 'fs';
 
 const execAsync = promisify(exec);
 
+// Add timeout wrapper
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+}
+
 async function startProduction() {
   try {
-    // Step 1: Setup database tables
-    await execAsync('node setup-db.js');
+    // Step 1: Setup database tables (with timeout)
+    await withTimeout(execAsync('node setup-db.js'), 60000); // 60 second timeout
 
     // Step 2: Check for Excel files and import if available
     const buildingsFile = '2025-5-23-iolp-buildings.xlsx';
     const leasesFile = '2025-5-23-iolp-leases.xlsx';
     
     if (fs.existsSync(buildingsFile) && fs.existsSync(leasesFile)) {
-      await execAsync('node scripts/import-data.js');
+      await withTimeout(execAsync('node scripts/import-data.js'), 120000); // 2 minute timeout
     }
 
     // Step 3: Start the server
@@ -46,6 +56,10 @@ async function startProduction() {
 
   } catch (error) {
     console.error('Startup failed:', error.message);
+    if (error.message.includes('timed out')) {
+      console.error('The operation took too long. This might be a database connectivity issue.');
+      console.error('Check your DATABASE_URL environment variable and database availability.');
+    }
     console.error('Stack trace:', error.stack);
     process.exit(1);
   }
