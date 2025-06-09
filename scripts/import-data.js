@@ -298,15 +298,9 @@ async function main() {
   } catch (error) {
     console.error('💥 Import failed:', error);
     process.exit(1);
-  } finally {
-    // Ensure database connection is properly closed
-    try {
-      await db.$client.end();
-    } catch (cleanupError) {
-      console.error('Database cleanup error:', cleanupError.message);
-    }
   }
   
+  // Exit cleanly without trying to close connection
   process.exit(0);
 }
 
