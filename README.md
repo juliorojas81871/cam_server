@@ -26,7 +26,7 @@ You will need to run the Client side at the same time to make the code fully wor
 
 1. **Clone the repository:**
 ```bash
-git clone [your-repo-url]
+git clone https://github.com/juliorojas81871/cam_server.git
 cd server
 ```
 
