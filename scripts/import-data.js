@@ -96,15 +96,6 @@ function mapLeaseData(row) {
   };
 }
 
-// Check if a lease already exists in the database by street address
-async function findExistingLease(leaseData) {
-  const existing = await db.select()
-    .from(schema.leases)
-    .where(eq(schema.leases.streetAddress, leaseData.streetAddress));
-  
-  return existing.length > 0 ? existing[0] : null;
-}
-
 // Convert building data to lease format
 function convertBuildingToLease(buildingRow) {
   return {
@@ -135,8 +126,9 @@ function convertBuildingToLease(buildingRow) {
 
 // Import buildings data - ONLY F (owned) buildings
 async function importBuildings() {
-  
+  console.log('📋 Processing buildings Excel file...');
   const rawData = readExcelFile('2025-5-23-iolp-buildings.xlsx');
+  console.log(`📊 Processing ${rawData.length} building records...`);
   
   const processedData = rawData.map(processRowData);
   
@@ -148,7 +140,10 @@ async function importBuildings() {
     row['Owned or Leased'] && row['Owned or Leased'] === 'L'
   );
   
+  console.log(`🏢 Found ${ownedBuildings.length} owned buildings and ${leasedBuildings.length} leased buildings`);
+  
   // Clear existing tables
+  console.log('🗑️  Clearing existing data...');
   await db.delete(schema.owned);
   await db.delete(schema.leases);
   
@@ -161,33 +156,55 @@ async function importBuildings() {
   
   // Import ONLY owned buildings (F) to owned table
   if (ownedBuildings.length > 0) {
+    console.log(`💾 Importing ${ownedBuildings.length} owned buildings...`);
     const ownedMappedData = ownedBuildings.map(mapBuildingData);
     
-    const batchSize = 100;
+    const batchSize = 500; // Increased batch size for better performance
     for (let i = 0; i < ownedMappedData.length; i += batchSize) {
       const batch = ownedMappedData.slice(i, i + batchSize);
       await db.insert(schema.owned).values(batch);
+      console.log(`✅ Imported ${Math.min(i + batchSize, ownedMappedData.length)} / ${ownedMappedData.length} owned buildings`);
     }
   }
   
   // Import leased buildings (L) to LEASES table
   if (leasedBuildings.length > 0) {
+    console.log(`💾 Importing ${leasedBuildings.length} leased buildings...`);
     const leasedMappedData = leasedBuildings.map(convertBuildingToLease);
     
-    const batchSize = 100;
+    const batchSize = 500; // Increased batch size for better performance
     for (let i = 0; i < leasedMappedData.length; i += batchSize) {
       const batch = leasedMappedData.slice(i, i + batchSize);
       await db.insert(schema.leases).values(batch);
+      console.log(`✅ Imported ${Math.min(i + batchSize, leasedMappedData.length)} / ${leasedMappedData.length} leased buildings`);
     }
   }
 }
 
-// Import leases data, checking for existing street addresses in leases table
+// Import leases data - OPTIMIZED for speed
 async function importLeases() {  
+  console.log('📋 Processing leases Excel file...');
   const rawData = readExcelFile('2025-5-23-iolp-leases.xlsx');  
+  console.log(`📊 Processing ${rawData.length} lease records...`);
+  
   const processedData = rawData.map(processRowData);
   
-  // Check which lease records have street addresses already in leases table
+  // Get ALL existing lease addresses in one query (MUCH faster than individual queries)
+  console.log('🔍 Fetching existing lease addresses...');
+  const existingLeases = await db.select({
+    id: schema.leases.id,
+    streetAddress: schema.leases.streetAddress
+  }).from(schema.leases);
+  
+  // Create a Map for O(1) lookup performance
+  const existingAddressMap = new Map();
+  existingLeases.forEach(lease => {
+    existingAddressMap.set(lease.streetAddress, lease.id);
+  });
+  
+  console.log(`📍 Found ${existingAddressMap.size} existing lease addresses`);
+  
+  // Process lease records efficiently
   let newLeaseRecords = [];
   let updatedLeaseRecords = [];
   let duplicateAddressCount = 0;
@@ -195,14 +212,14 @@ async function importLeases() {
   for (const leaseRow of processedData) {
     const mappedLease = mapLeaseData(leaseRow);
     
-    // Check if this street address already exists in leases table
-    const existingLease = await findExistingLease(mappedLease);
+    // Fast lookup using Map instead of database query
+    const existingLeaseId = existingAddressMap.get(mappedLease.streetAddress);
     
-    if (existingLease) {
+    if (existingLeaseId) {
       duplicateAddressCount++;
       // Update existing lease with lease-specific information
       updatedLeaseRecords.push({
-        id: existingLease.id,
+        id: existingLeaseId,
         leaseNumber: mappedLease.leaseNumber,
         leaseEffectiveDate: mappedLease.leaseEffectiveDate,
         leaseExpirationDate: mappedLease.leaseExpirationDate,
@@ -214,39 +231,80 @@ async function importLeases() {
     }
   }
   
-  // Update existing lease records with lease-specific information
+  console.log(`🔄 Found ${duplicateAddressCount} duplicate addresses to update`);
+  console.log(`➕ Found ${newLeaseRecords.length} new lease records to insert`);
+  
+  // Update existing lease records with lease-specific information - in batches
   if (updatedLeaseRecords.length > 0) {
-    for (const updateData of updatedLeaseRecords) {
-      await db.update(schema.leases)
-        .set({
-          leaseNumber: updateData.leaseNumber,
-          leaseEffectiveDate: updateData.leaseEffectiveDate,
-          leaseExpirationDate: updateData.leaseExpirationDate,
-          federalLeasedCode: updateData.federalLeasedCode
-        })
-        .where(eq(schema.leases.id, updateData.id));
+    console.log(`🔄 Updating ${updatedLeaseRecords.length} existing lease records...`);
+    
+    // Update in smaller batches to avoid timeouts
+    const updateBatchSize = 100;
+    for (let i = 0; i < updatedLeaseRecords.length; i += updateBatchSize) {
+      const batch = updatedLeaseRecords.slice(i, i + updateBatchSize);
+      
+      // Process batch updates
+      const updatePromises = batch.map(updateData =>
+        db.update(schema.leases)
+          .set({
+            leaseNumber: updateData.leaseNumber,
+            leaseEffectiveDate: updateData.leaseEffectiveDate,
+            leaseExpirationDate: updateData.leaseExpirationDate,
+            federalLeasedCode: updateData.federalLeasedCode
+          })
+          .where(eq(schema.leases.id, updateData.id))
+      );
+      
+      await Promise.all(updatePromises);
+      console.log(`✅ Updated ${Math.min(i + updateBatchSize, updatedLeaseRecords.length)} / ${updatedLeaseRecords.length} lease records`);
     }
   }
   
   // Import new lease records
   if (newLeaseRecords.length > 0) {
-    const batchSize = 100;
+    console.log(`💾 Importing ${newLeaseRecords.length} new lease records...`);
+    const batchSize = 500; // Increased batch size
     for (let i = 0; i < newLeaseRecords.length; i += batchSize) {
       const batch = newLeaseRecords.slice(i, i + batchSize);
       await db.insert(schema.leases).values(batch);
+      console.log(`✅ Imported ${Math.min(i + batchSize, newLeaseRecords.length)} / ${newLeaseRecords.length} new lease records`);
     }
   }
-  
 }
 
 // Main import function
 async function main() {
   try {
+    console.log('🚀 Starting data import process...');
+    const startTime = Date.now();
+    
     await importBuildings(); // First: Buildings separated by f(owned)/l(leased)
+    console.log('✅ Buildings import completed');
+    
     await importLeases();    // Second: Leases with duplicate checking    
+    console.log('✅ Leases import completed');
+    
+    // Final count verification
+    const ownedCount = await db.select({ count: count() }).from(schema.owned);
+    const leasesCount = await db.select({ count: count() }).from(schema.leases);
+    
+    const endTime = Date.now();
+    const duration = Math.round((endTime - startTime) / 1000);
+    
+    console.log(`🎉 Import completed successfully in ${duration} seconds!`);
+    console.log(`📊 Final counts - Owned: ${ownedCount[0].count}, Leases: ${leasesCount[0].count}`);
+    console.log(`📈 Total records: ${ownedCount[0].count + leasesCount[0].count}`);
+    
   } catch (error) {
-    console.error('Import failed:', error);
+    console.error('💥 Import failed:', error);
     process.exit(1);
+  } finally {
+    // Ensure database connection is properly closed
+    try {
+      await db.$client.end();
+    } catch (cleanupError) {
+      console.error('Database cleanup error:', cleanupError.message);
+    }
   }
   
   process.exit(0);
