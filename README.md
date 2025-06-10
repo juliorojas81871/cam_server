@@ -5,6 +5,7 @@
 This project requires building a full-stack web application to normalize and display GSA property data, featuring a relational database, data wrangling for building names, deployment with CI/CD, and a four-page frontend including a filterable building table, an interactive map with Google Maps API street-level views, and two distinct dashboards for owned and leased properties with various data visualizations and charts.
 If anyone want see this code, [please click at this link](https://cam-client.vercel.app)
 You will need to run the Client side at the same time to make the code fully work. [Here is the link](https://github.com/juliorojas81871/cam_client)
+**Note: This service is hosted on Render's free tier, which may introduce cold starts after periods of inactivity. When a cold start occurs, the server instance needs to spin up, which can take 60–120 seconds before it's ready to handle requests. You may experience a temporary delay during this initialization phase.**
 
 ## Technologies & Methods Used
 
