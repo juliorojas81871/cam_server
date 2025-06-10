@@ -3,27 +3,43 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import { db, schema } from '../src/db.js';
+import { count } from 'drizzle-orm';
 
 const execAsync = promisify(exec);
+
+async function hasExistingData() {
+  try {
+    const ownedCount = await db.select({ count: count() }).from(schema.owned);
+    return ownedCount[0].count > 0;
+  } catch (error) {
+    return false;
+  }
+}
 
 async function startProduction() {
   try {
     // Step 1: Setup database tables
     await execAsync('node setup-db.js');
 
-    // Step 2: Check for Excel files and import if available
-    const buildingsFile = '2025-5-23-iolp-buildings.xlsx';
-    const leasesFile = '2025-5-23-iolp-leases.xlsx';
+    // Step 2: Check if data already exists
+    const dataExists = await hasExistingData();
     
-    if (fs.existsSync(buildingsFile) && fs.existsSync(leasesFile)) {
-      try {
-        await execAsync('node scripts/import-data.js');
-      } catch (importError) {
-        console.error('Data import failed:', importError.message);
+    if (!dataExists) {
+      // Step 3: Check for Excel files and import if available
+      const buildingsFile = '2025-5-23-iolp-buildings.xlsx';
+      const leasesFile = '2025-5-23-iolp-leases.xlsx';
+      
+      if (fs.existsSync(buildingsFile) && fs.existsSync(leasesFile)) {
+        try {
+          await execAsync('node scripts/import-data.js');
+        } catch (importError) {
+          console.error('Data import failed:', importError.message);
+        }
       }
-    } 
+    }
 
-    // Step 3: Start the server
+    // Step 4: Start the server
     const serverProcess = exec('node server.js');
     
     // Forward server output
