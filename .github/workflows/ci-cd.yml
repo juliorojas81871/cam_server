@@ -147,9 +147,9 @@ jobs:
 
     - name: Deploy notification
       run: |
-        echo "🚀 Deployment artifact ready: cam-server-${{ github.sha }}"
-        echo "📦 Artifact contains the production-ready server"
-        echo "🔧 Next steps:"
+        echo "Deployment artifact ready: cam-server-${{ github.sha }}"
+        echo "Artifact contains the production-ready server"
+        echo "Next steps:"
         echo "  1. Download the artifact"
         echo "  2. Extract: tar -xzf deployment.tar.gz"
         echo "  3. Install dependencies: npm ci --only=production"

@@ -262,10 +262,10 @@ async function main() {
     await importLeases();    // Second: Leases with duplicate checking    
       
   } catch (error) {
-    console.error('💥 Import failed:', error);
+    console.error('Import failed:', error);
     process.exit(1);
   }
-  
+
   // Exit cleanly without trying to close connection
   process.exit(0);
 }

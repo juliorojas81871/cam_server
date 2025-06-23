@@ -100,16 +100,16 @@ async function createTables() {
     
     // Provide helpful error messages
     if (error.code === 'ENOTFOUND') {
-      console.error('💡 Database host not found. Check DB_HOST environment variable.');
+      console.error('Database host not found. Check DB_HOST environment variable.');
     } else if (error.code === 'ECONNREFUSED') {
-      console.error('💡 Connection refused. Check if database is running and DB_PORT is correct.');
+      console.error('Connection refused. Check if database is running and DB_PORT is correct.');
     } else if (error.message.includes('authentication')) {
-      console.error('💡 Authentication failed. Check DB_USER and DB_PASSWORD.');
+      console.error('Authentication failed. Check DB_USER and DB_PASSWORD.');
     } else if (error.message.includes('database') && error.message.includes('does not exist')) {
-      console.error('💡 Database does not exist. Check DB_NAME environment variable.');
+      console.error('Database does not exist. Check DB_NAME environment variable.');
     }
     
-    console.error('🔍 Environment variables:');
+    console.error('Environment variables:');
     console.error(`   DB_HOST: ${process.env.DB_HOST || 'NOT SET'}`);
     console.error(`   DB_PORT: ${process.env.DB_PORT || 'NOT SET'}`);
     console.error(`   DB_NAME: ${process.env.DB_NAME || 'NOT SET'}`);
