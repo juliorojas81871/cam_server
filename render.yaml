@@ -12,7 +12,9 @@ services:
       - key: PORT
         value: 3001
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: cam-postgres
+          property: connectionString
     disk:
       name: cam-data
       mountPath: /data
@@ -21,4 +23,5 @@ services:
 databases:
   - name: cam-postgres
     plan: free
-    databaseName: cam_database 
+    databaseName: cam_database
+    user: cam_postgres_zd0v_user
