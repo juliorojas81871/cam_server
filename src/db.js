@@ -6,17 +6,40 @@ import * as schema from './schema.js';
 // Load environment variables
 dotenv.config();
 
-// Handle both DATABASE_URL (Render) and individual env vars (local)
+// Function to parse DATABASE_URL
+function parseDatabaseUrl(url) {
+  if (!url) return null;
+  
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port),
+      database: parsed.pathname.substring(1), // Remove leading slash
+      username: parsed.username,
+      password: parsed.password,
+    };
+  } catch (error) {
+    console.error('Error parsing DATABASE_URL:', error.message);
+    return null;
+  }
+}
+
+// Database configuration with fallback values
 let dbConfig;
-let connectionString;
 
 if (process.env.DATABASE_URL) {
-  // Render provides DATABASE_URL
-  console.log('Using DATABASE_URL for connection');
-  connectionString = process.env.DATABASE_URL;
+  // Use DATABASE_URL if available (Render/production)
+  console.log('Using DATABASE_URL for database connection');
+  dbConfig = parseDatabaseUrl(process.env.DATABASE_URL);
+  
+  if (!dbConfig) {
+    console.error('Failed to parse DATABASE_URL');
+    process.exit(1);
+  }
 } else {
-  // Local development with individual env vars
-  console.log('Using individual environment variables for connection');
+  // Use individual environment variables (local development)
+  console.log('Using individual environment variables for database connection');
   dbConfig = {
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT),
@@ -43,9 +66,9 @@ if (process.env.DATABASE_URL) {
     console.warn('DB_USER=postgres');
     console.warn('DB_PASSWORD=your_password');
   }
-
-  connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 }
+
+const connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 
 // Create postgres connection
 const client = postgres(connectionString);
