@@ -3,48 +3,47 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-let connectionString;
+const dbConfig = {
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT),
+  database: process.env.DB_NAME,
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+};
 
-// Check if DATABASE_URL is provided (Render/production)
-if (process.env.DATABASE_URL) {
-  connectionString = process.env.DATABASE_URL;
-} else {
-  // Use individual environment variables (local development)
-  const dbConfig = {
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT),
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-  };
+// Validate configuration
+const missingVars = [];
+if (!process.env.DB_HOST) missingVars.push('DB_HOST');
+if (!process.env.DB_PORT) missingVars.push('DB_PORT');
+if (!process.env.DB_NAME) missingVars.push('DB_NAME');
+if (!process.env.DB_USER) missingVars.push('DB_USER');
+if (!process.env.DB_PASSWORD) missingVars.push('DB_PASSWORD');
 
-  // Validate configuration
-  const missingVars = [];
-  if (!process.env.DB_HOST) missingVars.push('DB_HOST');
-  if (!process.env.DB_PORT) missingVars.push('DB_PORT');
-  if (!process.env.DB_NAME) missingVars.push('DB_NAME');
-  if (!process.env.DB_USER) missingVars.push('DB_USER');
-  if (!process.env.DB_PASSWORD) missingVars.push('DB_PASSWORD');
-
-  if (missingVars.length > 0) {
-    console.error('Missing required environment variables:', missingVars.join(', '));
-    console.error('Please check your environment configuration.');
-    process.exit(1);
-  }
-
-  connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars.join(', '));
+  console.error('Please check your environment configuration.');
+  process.exit(1);
 }
 
+
+const connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 const sql = postgres(connectionString);
 
 async function createTables() {
   try {
+    console.log('🔧 Starting database setup...');
+    console.log('Testing database connection...');
+    
     // Test connection first
     await sql`SELECT 1 as test`;
+    console.log('✅ Database connection successful!');
     
     // Drop existing tables
+    console.log('🗑️  Dropping existing tables (if any)...');
     await sql`DROP TABLE IF EXISTS owned CASCADE`;
     await sql`DROP TABLE IF EXISTS leases CASCADE`;
+    
+    console.log('📦 Creating new tables...');
     
     // Create owned table
     await sql`
@@ -102,31 +101,30 @@ async function createTables() {
       )
     `;
     
+    console.log('✅ Database tables created successfully!');
+    console.log('   - owned table created');
+    console.log('   - leases table created');
+    
   } catch (error) {
     console.error('Error setting up database:', error.message);
     
     // Provide helpful error messages
     if (error.code === 'ENOTFOUND') {
-      console.error('Database host not found. Check connection string or environment variables.');
+      console.error('Database host not found. Check DB_HOST environment variable.');
     } else if (error.code === 'ECONNREFUSED') {
-      console.error('Connection refused. Check if database is running and accessible.');
+      console.error('Connection refused. Check if database is running and DB_PORT is correct.');
     } else if (error.message.includes('authentication')) {
-      console.error('Authentication failed. Check database credentials.');
+      console.error('Authentication failed. Check DB_USER and DB_PASSWORD.');
     } else if (error.message.includes('database') && error.message.includes('does not exist')) {
-      console.error('Database does not exist. Check database name in connection string.');
+      console.error('Database does not exist. Check DB_NAME environment variable.');
     }
     
-    if (process.env.DATABASE_URL) {
-      console.error('Environment variables:');
-      console.error(`   DATABASE_URL: ${process.env.DATABASE_URL ? '[SET]' : 'NOT SET'}`);
-    } else {
-      console.error('Environment variables:');
-      console.error(`   DB_HOST: ${process.env.DB_HOST || 'NOT SET'}`);
-      console.error(`   DB_PORT: ${process.env.DB_PORT || 'NOT SET'}`);
-      console.error(`   DB_NAME: ${process.env.DB_NAME || 'NOT SET'}`);
-      console.error(`   DB_USER: ${process.env.DB_USER || 'NOT SET'}`);
-      console.error(`   DB_PASSWORD: ${process.env.DB_PASSWORD ? '[SET]' : 'NOT SET'}`);
-    }
+    console.error('Environment variables:');
+    console.error(`   DB_HOST: ${process.env.DB_HOST || 'NOT SET'}`);
+    console.error(`   DB_PORT: ${process.env.DB_PORT || 'NOT SET'}`);
+    console.error(`   DB_NAME: ${process.env.DB_NAME || 'NOT SET'}`);
+    console.error(`   DB_USER: ${process.env.DB_USER || 'NOT SET'}`);
+    console.error(`   DB_PASSWORD: ${process.env.DB_PASSWORD ? '[SET]' : 'NOT SET'}`);
     
     process.exit(1);
   } finally {
