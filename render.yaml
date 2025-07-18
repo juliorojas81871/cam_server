@@ -19,6 +19,6 @@ services:
     autoDeploy: true
 
 databases:
-  - name: cam-postgres-new
+  - name: cam-postgres
     plan: free
-    databaseName: cam_database_new 
+    databaseName: cam_database 
