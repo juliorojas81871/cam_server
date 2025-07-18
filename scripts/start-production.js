@@ -22,8 +22,8 @@ async function startProduction() {
   
   try {
     // Step 1: Check if data already exists
-    const dataExists = await hasExistingData();
-    if (!dataExists) {
+    // const dataExists = await hasExistingData();
+    // if (!dataExists) {
 
         // Step 2: Setup database tables
         await execAsync('node setup-db.js');
@@ -39,7 +39,7 @@ async function startProduction() {
                 console.error('Data import failed:', importError.message);
             }
         }
-    }
+    // }
 
     // Step 4: Start the server
     const serverProcess = exec('node server.js');
