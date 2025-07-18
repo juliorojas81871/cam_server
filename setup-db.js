@@ -3,62 +3,28 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Function to parse DATABASE_URL
-function parseDatabaseUrl(url) {
-  if (!url) return null;
-  
-  try {
-    const parsed = new URL(url);
-    return {
-      host: parsed.hostname,
-      port: parseInt(parsed.port),
-      database: parsed.pathname.substring(1), // Remove leading slash
-      username: parsed.username,
-      password: parsed.password,
-    };
-  } catch (error) {
-    console.error('Error parsing DATABASE_URL:', error.message);
-    return null;
-  }
+const dbConfig = {
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT),
+  database: process.env.DB_NAME,
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+};
+
+// Validate configuration
+const missingVars = [];
+if (!process.env.DB_HOST) missingVars.push('DB_HOST');
+if (!process.env.DB_PORT) missingVars.push('DB_PORT');
+if (!process.env.DB_NAME) missingVars.push('DB_NAME');
+if (!process.env.DB_USER) missingVars.push('DB_USER');
+if (!process.env.DB_PASSWORD) missingVars.push('DB_PASSWORD');
+
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars.join(', '));
+  console.error('Please check your environment configuration.');
+  process.exit(1);
 }
 
-// Database configuration
-let dbConfig;
-
-if (process.env.DATABASE_URL) {
-  // Use DATABASE_URL if available (Render/production)
-  console.log('Using DATABASE_URL for database connection');
-  dbConfig = parseDatabaseUrl(process.env.DATABASE_URL);
-  
-  if (!dbConfig) {
-    console.error('Failed to parse DATABASE_URL');
-    process.exit(1);
-  }
-} else {
-  // Use individual environment variables (local development)
-  console.log('Using individual environment variables for database connection');
-  dbConfig = {
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT),
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-  };
-
-  // Validate configuration
-  const missingVars = [];
-  if (!process.env.DB_HOST) missingVars.push('DB_HOST');
-  if (!process.env.DB_PORT) missingVars.push('DB_PORT');
-  if (!process.env.DB_NAME) missingVars.push('DB_NAME');
-  if (!process.env.DB_USER) missingVars.push('DB_USER');
-  if (!process.env.DB_PASSWORD) missingVars.push('DB_PASSWORD');
-
-  if (missingVars.length > 0) {
-    console.error('Missing required environment variables:', missingVars.join(', '));
-    console.error('Please check your environment configuration.');
-    process.exit(1);
-  }
-}
 
 const connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 const sql = postgres(connectionString);

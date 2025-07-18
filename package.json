@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node scripts/start-production.js",
+    "start": "node setup-db.js && node scripts/import-data.js && node server.js",
     "start:prod": "node scripts/start-production.js",
     "start:dev": "node setup-db.js && node server.js",
     "dev": "node --watch server.js",
@@ -13,7 +13,6 @@
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "lint": "echo 'Linting passed - no linter configured'",
     "db:setup": "node setup-db.js",
-    "db:debug": "node scripts/debug-db.js",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
     "import": "node scripts/import-data.js",
