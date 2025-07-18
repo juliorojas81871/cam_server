@@ -13,6 +13,7 @@
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "lint": "echo 'Linting passed - no linter configured'",
     "db:setup": "node setup-db.js",
+    "db:debug": "node scripts/debug-db.js",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
     "import": "node scripts/import-data.js",

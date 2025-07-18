@@ -28,11 +28,24 @@ async function startProduction() {
   console.log('Database URL set:', !!process.env.DATABASE_URL);
   
   try {
-    // Step 1: Check if data already exists
+    // Step 1: Debug database connection first
+    console.log('🔍 Running database debug check...');
+    try {
+      const { stdout, stderr } = await execAsync('node scripts/debug-db.js');
+      console.log('Debug output:', stdout);
+      if (stderr) console.error('Debug warnings:', stderr);
+    } catch (debugError) {
+      console.error('❌ Database debug failed:', debugError.message);
+      if (debugError.stdout) console.log('Debug stdout:', debugError.stdout);
+      if (debugError.stderr) console.error('Debug stderr:', debugError.stderr);
+      // Continue anyway - debug failure shouldn't stop deployment
+    }
+
+    // Step 2: Check if data already exists
     // const dataExists = await hasExistingData();
     // if (!dataExists) {
 
-        // Step 2: Setup database tables
+        // Step 3: Setup database tables
         console.log('📦 Setting up database tables...');
         try {
           const { stdout, stderr } = await execAsync('node setup-db.js');
@@ -43,10 +56,19 @@ async function startProduction() {
           console.error('❌ Database setup failed:', setupError.message);
           if (setupError.stdout) console.log('Setup stdout:', setupError.stdout);
           if (setupError.stderr) console.error('Setup stderr:', setupError.stderr);
-          throw setupError;
+          
+          // Try the debug script again to force table creation
+          console.log('🔧 Attempting to force table creation...');
+          try {
+            await execAsync('node scripts/debug-db.js');
+            console.log('✅ Force table creation completed!');
+          } catch (forceError) {
+            console.error('❌ Force table creation also failed:', forceError.message);
+            throw setupError; // Re-throw original error
+          }
         }
         
-        // Step 3: Check for Excel files and import if available
+        // Step 4: Check for Excel files and import if available
         const buildingsFile = '2025-5-23-iolp-buildings.xlsx';
         const leasesFile = '2025-5-23-iolp-leases.xlsx';
         
@@ -67,7 +89,18 @@ async function startProduction() {
         }
     // }
 
-    // Step 4: Start the server
+    // Step 5: Final verification that tables exist
+    console.log('🧪 Final table verification...');
+    try {
+      const testQuery = await db.select({ count: count() }).from(schema.owned);
+      console.log('✅ Tables verified - owned table accessible');
+    } catch (verifyError) {
+      console.error('❌ Final verification failed:', verifyError.message);
+      console.error('Tables still don\'t exist! This is a critical error.');
+      // Don't exit - let the server start anyway so we can see more detailed errors
+    }
+
+    // Step 6: Start the server
     console.log('🌐 Starting server...');
     const serverProcess = exec('node server.js');
     
