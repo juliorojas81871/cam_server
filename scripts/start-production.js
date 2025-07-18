@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+console.log('🎯 PRODUCTION STARTUP SCRIPT STARTED');
+console.log('📍 Current working directory:', process.cwd());
+console.log('📍 Script path:', import.meta.url);
+
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';

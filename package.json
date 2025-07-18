@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node setup-db.js && node scripts/import-data.js && node server.js",
+    "start": "node scripts/start-production.js",
     "start:prod": "node scripts/start-production.js",
     "start:dev": "node setup-db.js && node server.js",
     "dev": "node --watch server.js",
