@@ -26,7 +26,7 @@ async function startProduction() {
     // if (!dataExists) {
 
         // Step 2: Setup database tables
-        await execAsync('node setup-db.js');
+        await execAsync('npm run db:setup');
         
         // Step 3: Check for Excel files and import if available
         const buildingsFile = '2025-5-23-iolp-buildings.xlsx';
@@ -34,7 +34,7 @@ async function startProduction() {
         
         if (fs.existsSync(buildingsFile) && fs.existsSync(leasesFile)) {
             try {
-                await execAsync('node scripts/import-data.js');
+                await execAsync('npm run import');
             } catch (importError) {
                 console.error('Data import failed:', importError.message);
             }
@@ -42,7 +42,7 @@ async function startProduction() {
     // }
 
     // Step 4: Start the server
-    const serverProcess = exec('node server.js');
+    const serverProcess = exec('npm run dev');
     
     // Forward server output
     serverProcess.stdout.on('data', (data) => {
