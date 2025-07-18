@@ -31,19 +31,12 @@ const sql = postgres(connectionString);
 
 async function createTables() {
   try {
-    console.log('🔧 Starting database setup...');
-    console.log('Testing database connection...');
-    
     // Test connection first
     await sql`SELECT 1 as test`;
-    console.log('✅ Database connection successful!');
     
     // Drop existing tables
-    console.log('🗑️  Dropping existing tables (if any)...');
     await sql`DROP TABLE IF EXISTS owned CASCADE`;
     await sql`DROP TABLE IF EXISTS leases CASCADE`;
-    
-    console.log('📦 Creating new tables...');
     
     // Create owned table
     await sql`
@@ -101,9 +94,6 @@ async function createTables() {
       )
     `;
     
-    console.log('✅ Database tables created successfully!');
-    console.log('   - owned table created');
-    console.log('   - leases table created');
     
   } catch (error) {
     console.error('Error setting up database:', error.message);
