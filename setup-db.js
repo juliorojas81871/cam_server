@@ -3,30 +3,42 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const dbConfig = {
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT),
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-};
+// Handle both DATABASE_URL (Render) and individual env vars (local)
+let dbConfig;
+let connectionString;
 
-// Validate configuration
-const missingVars = [];
-if (!process.env.DB_HOST) missingVars.push('DB_HOST');
-if (!process.env.DB_PORT) missingVars.push('DB_PORT');
-if (!process.env.DB_NAME) missingVars.push('DB_NAME');
-if (!process.env.DB_USER) missingVars.push('DB_USER');
-if (!process.env.DB_PASSWORD) missingVars.push('DB_PASSWORD');
+if (process.env.DATABASE_URL) {
+  // Render provides DATABASE_URL
+  console.log('Using DATABASE_URL for connection');
+  connectionString = process.env.DATABASE_URL;
+} else {
+  // Local development with individual env vars
+  console.log('Using individual environment variables for connection');
+  dbConfig = {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT),
+    database: process.env.DB_NAME,
+    username: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+  };
 
-if (missingVars.length > 0) {
-  console.error('Missing required environment variables:', missingVars.join(', '));
-  console.error('Please check your environment configuration.');
-  process.exit(1);
+  // Validate configuration
+  const missingVars = [];
+  if (!process.env.DB_HOST) missingVars.push('DB_HOST');
+  if (!process.env.DB_PORT) missingVars.push('DB_PORT');
+  if (!process.env.DB_NAME) missingVars.push('DB_NAME');
+  if (!process.env.DB_USER) missingVars.push('DB_USER');
+  if (!process.env.DB_PASSWORD) missingVars.push('DB_PASSWORD');
+
+  if (missingVars.length > 0) {
+    console.error('Missing required environment variables:', missingVars.join(', '));
+    console.error('Please check your environment configuration.');
+    process.exit(1);
+  }
+
+  connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 }
 
-
-const connectionString = `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
 const sql = postgres(connectionString);
 
 async function createTables() {
